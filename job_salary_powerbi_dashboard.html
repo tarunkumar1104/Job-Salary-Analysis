@@ -1,0 +1,233 @@
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); }
+.db { padding: 16px; background: var(--color-background-tertiary); min-height: 100vh; }
+.topbar { display: flex; align-items: center; justify-content: space-between; background: #1F4E79; color: #fff; border-radius: 10px; padding: 10px 18px; margin-bottom: 14px; }
+.topbar-title { font-size: 15px; font-weight: 500; letter-spacing: .3px; }
+.topbar-filters { display: flex; gap: 8px; }
+.topbar-filters select { background: rgba(255,255,255,0.15); color: #fff; border: 0.5px solid rgba(255,255,255,0.3); border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; }
+.topbar-filters select option { color: #222; background: #fff; }
+.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+.kpi { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: 10px; padding: 14px 16px; }
+.kpi-label { font-size: 11px; color: var(--color-text-secondary); margin-bottom: 6px; text-transform: uppercase; letter-spacing: .5px; }
+.kpi-value { font-size: 22px; font-weight: 500; color: var(--color-text-primary); }
+.kpi-sub { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
+.kpi-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; }
+.charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.charts-row2 { display: grid; grid-template-columns: 1.4fr 1fr; gap: 10px; margin-bottom: 10px; }
+.card { background: var(--color-background-primary); border: 0.5px solid var(--color-border-tertiary); border-radius: 10px; padding: 14px 16px; }
+.card-title { font-size: 12px; font-weight: 500; color: var(--color-text-secondary); margin-bottom: 12px; text-transform: uppercase; letter-spacing: .5px; }
+.chart-wrap { position: relative; width: 100%; }
+</style>
+
+<div class="db">
+  <div class="topbar">
+    <span class="topbar-title">Job Salary Prediction — Power BI Dashboard</span>
+    <div class="topbar-filters">
+      <select id="filterIndustry" onchange="applyFilter()">
+        <option value="All">All Industries</option>
+        <option>Technology</option><option>Finance</option><option>Healthcare</option>
+        <option>Education</option><option>Media</option><option>Retail</option>
+        <option>Government</option><option>Consulting</option><option>Telecom</option><option>Manufacturing</option>
+      </select>
+      <select id="filterRemote" onchange="applyFilter()">
+        <option value="All">All Work Types</option>
+        <option>Yes</option><option>No</option><option>Hybrid</option>
+      </select>
+      <select id="filterEdu" onchange="applyFilter()">
+        <option value="All">All Education</option>
+        <option>PhD</option><option>Master</option><option>Bachelor</option><option>Diploma</option><option>High School</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="kpi-row">
+    <div class="kpi">
+      <div class="kpi-label">Total Records</div>
+      <div class="kpi-value" id="kpi-total">2,50,000</div>
+      <div class="kpi-sub">Job listings</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Avg Salary</div>
+      <div class="kpi-value" id="kpi-avg" style="color:#1F4E79">$1,45,718</div>
+      <div class="kpi-sub">Per year</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Max Salary</div>
+      <div class="kpi-value" id="kpi-max" style="color:#1a7a3c">$3,33,046</div>
+      <div class="kpi-sub">Highest offer</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">High Earners</div>
+      <div class="kpi-value" id="kpi-high" style="color:#c0392b">20,333</div>
+      <div class="kpi-sub">Above $2,00,000</div>
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="card">
+      <div class="card-title">Avg Salary by Job Title</div>
+      <div class="chart-wrap" style="height:260px"><canvas id="jobChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Salary by Education Level</div>
+      <div class="chart-wrap" style="height:260px"><canvas id="eduChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="charts-row2">
+    <div class="card">
+      <div class="card-title">Experience vs Avg Salary</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="expChart"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Remote Work Distribution</div>
+      <div class="chart-wrap" style="height:220px"><canvas id="remoteChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Salary Band Distribution</div>
+    <div class="chart-wrap" style="height:160px"><canvas id="bandChart"></canvas></div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const BASE = {
+  jobs: {
+    labels: ['AI Engineer','ML Engineer','Product Mgr','Cloud Eng','DevOps Eng','Cybersec','Data Scientist','Soft Eng','Backend Dev','Frontend Dev','Biz Analyst','Data Analyst'],
+    salaries: [173498,163023,157595,152103,149959,148698,147258,141740,139203,132654,122551,119892]
+  },
+  edu: {
+    labels: ['PhD','Master','Bachelor','Diploma','High School'],
+    salaries: [163976,153305,142411,137159,131715]
+  },
+  exp: {
+    labels: ['0','2','4','6','8','10','12','14','16','18','20'],
+    salaries: [105000,112000,121000,131000,139000,147000,154000,161000,167000,172000,178000]
+  },
+  remote: { labels: ['Office','Hybrid','Remote'], counts: [83621,83476,82903] },
+  bands: { labels: ['Low (<$80K)','Mid ($80K-$130K)','High ($130K-$200K)','Very High (>$200K)'], counts: [6610,82256,140801,20333] }
+};
+
+const MULTIPLIERS = {
+  industry: { All:1, Technology:1.01, Finance:1.005, Healthcare:0.998, Education:0.995, Media:0.997, Retail:0.99, Government:0.993, Consulting:0.996, Telecom:1.0, Manufacturing:0.994 },
+  remote: { All:1, Yes:1.005, No:0.998, Hybrid:1.0 },
+  edu: { All:1, PhD:1.13, Master:1.06, Bachelor:1.0, Diploma:0.95, 'High School':0.91 }
+};
+
+let charts = {};
+
+function getMultiplier() {
+  const i = document.getElementById('filterIndustry').value;
+  const r = document.getElementById('filterRemote').value;
+  const e = document.getElementById('filterEdu').value;
+  return (MULTIPLIERS.industry[i]||1) * (MULTIPLIERS.remote[r]||1) * (MULTIPLIERS.edu[e]||1);
+}
+
+function applyFilter() {
+  const m = getMultiplier();
+  const adjSalaries = BASE.jobs.salaries.map(s => Math.round(s * m));
+  const avgSal = Math.round(145718 * m);
+
+  document.getElementById('kpi-avg').textContent = '$' + avgSal.toLocaleString();
+  document.getElementById('kpi-max').textContent = '$' + Math.round(333046 * m).toLocaleString();
+  document.getElementById('kpi-high').textContent = Math.round(20333 * m).toLocaleString();
+
+  charts.job.data.datasets[0].data = adjSalaries;
+  charts.job.update();
+
+  const adjEdu = BASE.edu.salaries.map(s => Math.round(s * m));
+  charts.edu.data.datasets[0].data = adjEdu;
+  charts.edu.update();
+
+  const adjExp = BASE.exp.salaries.map(s => Math.round(s * m));
+  charts.exp.data.datasets[0].data = adjExp;
+  charts.exp.update();
+}
+
+function initCharts() {
+  charts.job = new Chart(document.getElementById('jobChart'), {
+    type: 'bar',
+    data: {
+      labels: BASE.jobs.labels,
+      datasets: [{ label: 'Avg Salary ($)', data: BASE.jobs.salaries, backgroundColor: '#2E75B6', borderRadius: 4, borderSkipped: false }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { callback: v => '$' + (v/1000).toFixed(0)+'K', font: { size: 11 } }, grid: { color: 'rgba(0,0,0,0.05)' } },
+        y: { ticks: { font: { size: 11 } } }
+      }
+    }
+  });
+
+  charts.edu = new Chart(document.getElementById('eduChart'), {
+    type: 'doughnut',
+    data: {
+      labels: BASE.edu.labels,
+      datasets: [{ data: BASE.edu.salaries, backgroundColor: ['#1F4E79','#2E75B6','#4A90C4','#7FB3D3','#B0CCE2'], borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'right', labels: { font: { size: 11 }, padding: 10 } },
+        tooltip: { callbacks: { label: ctx => ctx.label + ': $' + ctx.raw.toLocaleString() } }
+      }
+    }
+  });
+
+  charts.exp = new Chart(document.getElementById('expChart'), {
+    type: 'line',
+    data: {
+      labels: BASE.exp.labels,
+      datasets: [{ label: 'Avg Salary', data: BASE.exp.salaries, borderColor: '#1F4E79', backgroundColor: 'rgba(31,78,121,0.08)', fill: true, tension: 0.4, pointRadius: 4, pointBackgroundColor: '#1F4E79' }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { title: { display: true, text: 'Experience (years)', font: { size: 11 } }, ticks: { font: { size: 11 } } },
+        y: { ticks: { callback: v => '$' + (v/1000).toFixed(0)+'K', font: { size: 11 } }, grid: { color: 'rgba(0,0,0,0.05)' } }
+      }
+    }
+  });
+
+  charts.remote = new Chart(document.getElementById('remoteChart'), {
+    type: 'pie',
+    data: {
+      labels: BASE.remote.labels,
+      datasets: [{ data: BASE.remote.counts, backgroundColor: ['#1F4E79','#2E75B6','#7FB3D3'], borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10 } },
+        tooltip: { callbacks: { label: ctx => ctx.label + ': ' + ctx.raw.toLocaleString() } }
+      }
+    }
+  });
+
+  charts.band = new Chart(document.getElementById('bandChart'), {
+    type: 'bar',
+    data: {
+      labels: BASE.bands.labels,
+      datasets: [{ data: BASE.bands.counts, backgroundColor: ['#7FB3D3','#2E75B6','#1F4E79','#0a2a45'], borderRadius: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { font: { size: 11 } } },
+        y: { ticks: { callback: v => (v/1000).toFixed(0)+'K', font: { size: 11 } }, grid: { color: 'rgba(0,0,0,0.05)' } }
+      }
+    }
+  });
+}
+
+initCharts();
+</script>
